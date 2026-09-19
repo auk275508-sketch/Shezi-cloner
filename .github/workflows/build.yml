@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Java
@@ -20,12 +20,220 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Create Android project
+        shell: bash
+        run: |
+          mkdir -p app/src/main/java/com/shezi/cloner
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "SHEZI_CLONER"
+          include(":app")
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.shezi.cloner'
+              compileSdk 35
+
+              defaultConfig {
+                  applicationId 'com.shezi.cloner'
+                  minSdk 26
+                  targetSdk 35
+                  versionCode 1
+                  versionName '1.0'
+              }
+          }
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme"
+                  parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:colorAccent">#6750A4</item>
+                  <item name="android:statusBarColor">#6750A4</item>
+                  <item name="android:navigationBarColor">#000000</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <queries>
+                  <intent>
+                      <action android:name="android.intent.action.MAIN"/>
+                      <category android:name="android.intent.category.LAUNCHER"/>
+                  </intent>
+              </queries>
+
+              <application
+                  android:theme="@style/AppTheme"
+                  android:label="SHEZI CLONER"
+                  android:allowBackup="true"
+                  android:supportsRtl="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+
+                  </activity>
+
+              </application>
+
+          </manifest>
+          EOF
+
+          cat > app/src/main/java/com/shezi/cloner/MainActivity.java <<'EOF'
+          package com.shezi.cloner;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.content.pm.ApplicationInfo;
+          import android.content.pm.PackageManager;
+          import android.graphics.Color;
+          import android.view.Gravity;
+          import android.widget.*;
+          import java.util.*;
+
+          public class MainActivity extends Activity {
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setPadding(32, 48, 32, 32);
+                  root.setBackgroundColor(Color.WHITE);
+
+                  TextView title = new TextView(this);
+                  title.setText("SHEZI CLONER");
+                  title.setTextSize(30);
+                  title.setTextColor(Color.BLACK);
+                  title.setGravity(Gravity.CENTER);
+
+                  TextView subtitle = new TextView(this);
+                  subtitle.setText("PRIVATE APP CLONER");
+                  subtitle.setTextSize(15);
+                  subtitle.setGravity(Gravity.CENTER);
+                  subtitle.setPadding(0, 12, 0, 30);
+
+                  Spinner apps = new Spinner(this);
+
+                  EditText cloneName = new EditText(this);
+                  cloneName.setHint("Clone name");
+                  cloneName.setSingleLine(true);
+
+                  TextView info = new TextView(this);
+                  info.setText(
+                      "Select an installed app and configure its clone name."
+                      + "\\n\\nThis version is a prototype and does not modify"
+                      + " or re-sign another application's APK."
+                  );
+                  info.setTextSize(14);
+                  info.setPadding(0, 20, 0, 20);
+
+                  Button button = new Button(this);
+                  button.setText("CREATE CLONE CONFIG");
+
+                  root.addView(title);
+                  root.addView(subtitle);
+                  root.addView(apps);
+                  root.addView(cloneName);
+                  root.addView(info);
+                  root.addView(button);
+
+                  setContentView(root);
+
+                  PackageManager pm = getPackageManager();
+
+                  List<ApplicationInfo> installed =
+                      pm.getInstalledApplications(0);
+
+                  ArrayList<String> names = new ArrayList<>();
+
+                  for (ApplicationInfo app : installed) {
+                      if ((app.flags & ApplicationInfo.FLAG_SYSTEM) == 0) {
+                          names.add(pm.getApplicationLabel(app).toString());
+                      }
+                  }
+
+                  Collections.sort(names);
+
+                  ArrayAdapter<String> adapter =
+                      new ArrayAdapter<>(
+                          this,
+                          android.R.layout.simple_spinner_dropdown_item,
+                          names
+                      );
+
+                  apps.setAdapter(adapter);
+
+                  button.setOnClickListener(v -> {
+                      String selected =
+                          apps.getSelectedItem() != null
+                          ? apps.getSelectedItem().toString()
+                          : "No app selected";
+
+                      String name = cloneName.getText().toString().trim();
+
+                      if (name.isEmpty()) {
+                          name = selected + " Clone";
+                      }
+
+                      new AlertDialog.Builder(this)
+                          .setTitle("SHEZI CLONER")
+                          .setMessage(
+                              "Selected: " + selected
+                              + "\\nClone name: " + name
+                              + "\\n\\nConfiguration created."
+                          )
+                          .setPositiveButton("OK", null)
+                          .show();
+                  });
+              }
+          }
+          EOF
+
+      - name: Install Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Build APK
+      - name: Build SHEZI CLONER
         run: gradle assembleDebug --no-daemon
 
       - name: Upload APK
